@@ -12,8 +12,8 @@ The .csv files should be replaced with updated ones whenever you want, as new IP
 The code scrapes data from the https://www.gurufocus.com/ website for every ticker found. The process uses regular expressions to locate the numbers.
 For each ticker the code downloads (if available):
 - Stock price
-- ROIC (in %)	Owner 
-- Earnings per Share	
+- ROIC (in %)	
+- Owner Earnings per Share	
 - 10y Revenue Growth	
 - 10y EPS Growth	
 - 10y FCF Growth	
