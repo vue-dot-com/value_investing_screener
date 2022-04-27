@@ -27,5 +27,5 @@ For each ticker the code downloads (if available):
 The output is a pandas dataframe which is exported as a .csv file in your working directory.
 
 ### Suggestions and improvements
-I have made the work available to everyone, feel free to share, improve and commit to it. Inside the code you will find some #TODO which I wanted to implement.
+I have made the work available to everyone, feel free to share, improve and commit to it. Inside the code you will find some `#TODO` which I wanted to implement.
 Hope you will enjoy it and find it useful as much as I did.
