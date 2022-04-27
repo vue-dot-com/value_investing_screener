@@ -9,7 +9,10 @@ The code takes two .csv files containing tickers traded in the NASDAQ and the NY
 The .csv files should be replaced with updated ones whenever you want, as new IPOs take place or firms are delisted during time.
 
 ### Code
-The code scrapes data from the https://www.gurufocus.com/ website for every ticker found. The process uses regular expressions to locate the numbers.
+The code scrapes data from the https://www.gurufocus.com/ website for every ticker found. The process uses regular expressions to locate the numbers. Before running the could you should install the packages required. Download the `requirements.txt` in the repo in your local directory and run in your terminal
+```
+pip install -r /path/to/requirements.txt
+```
 For each ticker the code downloads (if available):
 - Stock price
 - ROIC (in %)	
