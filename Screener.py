@@ -1,10 +1,14 @@
-#This script tries to find possible stocks that applies for value investing principles.
-##########IMPORT TICKERS#############
-#importing CSV files with tickers and names
-#You need to have those CSV files in your working directory. The link for the download is:
-#NYSE: http://www.nasdaq.com/screening/companies-by-industry.aspx?exchange=NYSE&render=download
-#NASDAQ: http://www.nasdaq.com/screening/companies-by-industry.aspx?exchange=NASDAQ&render=download
-#They change when new IPOs (new listed companies) happen. Anyway update them every 1 or 2 years.
+
+"""
+This script tries to find possible stocks that applies for value investing principles. 
+Please refer to the README.md file to get basic understanding of it and what it does.
+Follow the instructions and be patient, it will take a while to run.
+Please, very humbly I made this available to anyone who wants to use and collaborate, do cite me if you can.
+I hope you will enjoy. 
+
+"""
+
+
 import csv, os
 import requests
 import bs4
@@ -15,6 +19,13 @@ import pandas as pd
 import yfinance as yf
 import pandas as pd
 
+##########################################DATABASE IMPORT#########################################################
+
+#importing CSV files with tickers and names
+#You need to have those CSV files in your working directory. The link for the download is:
+#NYSE: http://www.nasdaq.com/screening/companies-by-industry.aspx?exchange=NYSE&render=download
+#NASDAQ: http://www.nasdaq.com/screening/companies-by-industry.aspx?exchange=NASDAQ&render=download
+#They change when new IPOs (new listed companies) happen. Anyway update them every 1 or 2 years.
 
 nyse = pd.read_csv('NYSE.csv')
 nasdaq = pd.read_csv('NASDAQ.csv')
@@ -33,6 +44,8 @@ capitalization = stocks['Market Cap'].to_list()
 
 print('Ticker list created with ' + str(len(ticker))+ ' elements')
 print('Collecting URLs...')
+print('Setting up requests session (maybe you will go faster)...')
+s=requests.Session() #Setting up session for Requests (it seems to speed up a litte the process)
 
 #Storing URLs
 evUrl = list([])
@@ -79,7 +92,7 @@ def adj_prices():
 #Retrieve Enterprise Value numbers
 def ev_catcher():
     for u in evUrl[len(enterpriseValue):len(evUrl)] :
-        res = requests.get(u)
+        res = s.get(u)
         from bs4 import SoupStrainer
 
         # Match only font tag in the HTML source
@@ -101,7 +114,7 @@ def ev_catcher():
 #Retrieve Owner Earnings Numbers
 def oe_catcher():
     for u in oeUrl[len(ownerEarnings):len(oeUrl)]:
-        res = requests.get(u)
+        res = s.get(u)
         from bs4 import SoupStrainer
 
         # Match only font tag in the HTML source
@@ -124,7 +137,7 @@ def oe_catcher():
 #Retrieve Roic numbers
 def ro_catcher():
     for u in roicUrl[len(roic):len(roicUrl)]:
-        res = requests.get(u)
+        res = s.get(u)
         from bs4 import SoupStrainer
 
         # Match only font tag in the HTML source
@@ -147,7 +160,7 @@ def ro_catcher():
 #Retrieve Growth numbers
 def gr_catcher():
     for u in growthsUrl[len(revenueGrowth10y):len(growthsUrl)]:
-        res = requests.get(u)
+        res = s.get(u)
         from bs4 import SoupStrainer
 
         only_tr_tag = SoupStrainer('tr')
@@ -214,7 +227,7 @@ def gr_catcher():
 #TODO: cash to asset, operating and profit margin
 def summary_catcher():
     for u in summaryUrl[len(cash_to_debt):len(summaryUrl)]:
-        res = requests.get(u)
+        res = s.get(u)
         from bs4 import SoupStrainer
 
         only_td_tag = SoupStrainer('td')
@@ -289,7 +302,7 @@ def download_thread():
     e3.join()
     e4.join()
     e5.join()
-    print('Download ended, it took' + str(time.time()-origin_time))
+    print('Download ended, it took ' + str(round(time.time()-origin_time, 2)) + " seconds")
 
 ##########################################DEFINITIONS END#########################################################
 
@@ -302,6 +315,7 @@ print('Below you can type:',
 
 update = input()
 if update == 'yes':
+
     #1. ROIC (Return on invested capital). Measures how well a company generates cash flow relative to the capital it
     # has invested in its business. >10%
     roic = []
@@ -322,10 +336,10 @@ if update == 'yes':
     op_margin=[]
     net_margin=[]
 
-    print('starting download...')
+    print('starting download...get outside, see you in a looong time')
     download_thread()
 
-    print('Download ended')
+    print('You did it, now let me save your file in a .pickle, this saves space...')
 
 #Save data into pickle file
     with open('Newobjs.pickle', 'wb') as f: # Python 2: open(...,'w')
@@ -381,7 +395,7 @@ df = pd.DataFrame(data, columns=['Ticker',
                                  'Industry',
                                  'Price',
                                  'Market Cap',
-                                 #'Enterprise Value (in Mill.)',
+                                 'Enterprise Value (in Mill.)',
                                  'ROIC (in %)',
                                  'Owner Earnings per Share',
                                  '10y Revenue Growth',
@@ -396,12 +410,12 @@ df['10y EPS Growth'] = df['10y EPS Growth'].replace({'N\/A':''}, regex= True)
 df['10y FCF Growth'] = df['10y FCF Growth'].replace({'N\/A':''}, regex= True)
 df['10y BV Growth'] = df['10y BV Growth'].replace({'N\/A':''}, regex= True)
 #Convert dollar values into numeric
-#df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\$':''}, regex = True)
-#df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\,':''}, regex = True)
-
+df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\$':''}, regex = True)
+df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\,':''}, regex = True)
+df['Price'] = df['Price'].replace({'\$':''}, regex = True)
 #Convert into numeric
 df['Owner Earnings per Share'] = pd.to_numeric(df['Owner Earnings per Share'])
-#df['Enterprise Value (in Mill.)'] = pd.to_numeric(df['Enterprise Value (in Mill.)'])
+df['Enterprise Value (in Mill.)'] = pd.to_numeric(df['Enterprise Value (in Mill.)'])
 df['Price'] = pd.to_numeric(df['Price'])
 df['Market Cap'] = pd.to_numeric(df['Market Cap'])
 df['ROIC (in %)'] = pd.to_numeric(df['ROIC (in %)'])
@@ -410,12 +424,12 @@ df['10y EPS Growth'] = pd.to_numeric(df['10y EPS Growth'])
 df['10y FCF Growth'] = pd.to_numeric(df['10y FCF Growth'])
 df['10y BV Growth'] = pd.to_numeric(df['10y BV Growth'])
 
+#Creating Ten Cap variable
 tenCap = df['Owner Earnings per Share']*10
-df.insert(12, 'Ten Cap  Valuation', tenCap)
-#df['Ten Cap Valuation'] = pd.to_numeric(df['Ten Cap Valuation'])
+df.insert(12, 'Ten Cap Valuation', tenCap)
+df['Ten Cap Valuation'] = pd.to_numeric(df['Ten Cap Valuation'])
 
-
-print(df)
+#Save .csv
 df.to_csv('Screener.csv', index=False, sep=';')
 print(r'CSV file called ''Screener'' created')
 
@@ -424,7 +438,7 @@ print(r'CSV file called ''Screener'' created')
 ####5y roic####
 #def ro5_catcher():
     #for u in roUrl[len(roic):len(roUrl)]:
-        #res = requests.get(u)
+        #res = s.get(u)
         #from bs4 import SoupStrainer
 
         #only_tr_tag = SoupStrainer('tr')
