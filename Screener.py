@@ -20,7 +20,6 @@ import yfinance as yf
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-#pip install webdriver-manager
 from webdriver_manager.chrome import ChromeDriverManager
 
 
@@ -52,8 +51,12 @@ print('Collecting URLs...')
 print('Setting up requests session (maybe you will go faster)...')
 
 s=requests.Session() #Setting up session for Requests (it seems to speed up a litte the process)
-#TODO: Setup session for selenium
-driver = webdriver.Chrome(ChromeDriverManager().install())
+
+#Setup session for selenium
+from selenium.webdriver.chrome.options import Options
+chrome_options = Options()
+chrome_options.set_headless() #With this option the browser does not open every time
+driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=chrome_options)
 
 #Storing URLs
 evUrl = list([])
@@ -166,88 +169,114 @@ def ro_catcher():
             len(roic) / len(ticker) * 100) + '% )')
 
 #NEW GROWTH NUMBERS 
-def gr_catcher2():
+def gr_catcher():
+    gr_numbers_10y = list([])
+    gr_numbers_5y = list([])
     for u in growthsUrl[len(revenueGrowth10y):len(growthsUrl)]:
-        gr_numbers_10y = list([])
-        gr_numbers_5y = list([])
+        #Selenium request
         driver.get(u)
-        for i in range(1,9): 
+        time.sleep(10) #Allows the page to load correctly so that it can locate the below XPATHs
+        for i in range(1,9):
             #Finds 10y Revenue, EPS, EBIT, EBITDA, FCF, Dividends, BV, Totale Return from stock
             gr_numbers_10y.append(driver.find_element(By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody/tr['+str(i)+']/td[2]').text)
             #Finds 10y Revenue, EPS, EBIT, EBITDA, FCF, Dividends, BV, Totale Return from stock
             gr_numbers_5y.append(driver.find_element(By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody/tr['+str(i)+']/td[3]').text)
-        print()
-        
-
-
-
-
-#Retrieve Growth numbers
-def gr_catcher():
-    for u in growthsUrl[len(revenueGrowth10y):len(growthsUrl)]:
-        res = s.get(u)
-        from bs4 import SoupStrainer
-
-        only_tr_tag = SoupStrainer('tr')
-        grSoup = bs4.BeautifulSoup(res.text, 'lxml', parse_only=only_tr_tag)
-        grText = grSoup.select('tr')
-        # find oe number inside the page and attach it to the list oe
-
-
-        grRegex = re.compile(r'(?:\+|\-|)(?<!\.)(?!0+(?:\.0+)?%)(?:\d|[1-9]\d|100)(?:(?<!100)\.\d+)|(?:N\/A)')
-
-        text = str(grText)
-
-        # 10Y revenue growth
-        try:
-
-            if grRegex.findall(text)[4] == 'N/A':
-                revenueGrowth10y.append(
-                    grRegex.findall(text)[5])  # If it doesn't find 10y growth it looks for the 5y growth
+            
+            #Allocation
+            if i==1:
+                revenueGrowth10y.append(gr_numbers_10y[i-1])
+                revenueGrowth5y.append(gr_numbers_5y[i-1])
+            elif i==2:
+                epsGrowth10y.append(gr_numbers_10y[i-1])
+                epsGrowth5y.append(gr_numbers_5y[i-1])
+            elif i==3:
+                ebitGrowth10y.append(gr_numbers_10y[i-1])
+                ebitGrowth5y.append(gr_numbers_5y[i-1])
+            elif i==4:
+                ebitdaGrowth10y.append(gr_numbers_10y[i-1])
+                ebitdaGrowth5y.append(gr_numbers_5y[i-1])
+            elif i==5:
+                fcfGrowth10y.append(gr_numbers_10y[i-1])
+                fcfGrowth5y.append(gr_numbers_5y[i-1])
+            elif i==6:
+                dividendGrowth10y.append(gr_numbers_10y[i-1])
+                dividendGrowth5y.append(gr_numbers_5y[i-1])
+            elif i==7:
+                bvGrowth10y.append(gr_numbers_10y[i-1])
+                bvGrowth5y.append(gr_numbers_5y[i-1])
             else:
-                revenueGrowth10y.append(grRegex.findall(text)[4])
-        except:
-            revenueGrowth10y.append('')
+                stockPriceGrowth10y.append(gr_numbers_10y[i-1])
+                stockPriceGrowth5y.append(gr_numbers_5y[i-1])
         print(str(len(revenueGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
             len(revenueGrowth10y) / len(ticker) * 100) + '% )')
+       
+        
+# #Retrieve Growth numbers
+# def gr_catcher():
+#     for u in growthsUrl[len(revenueGrowth10y):len(growthsUrl)]:
+#         res = s.get(u)
+#         from bs4 import SoupStrainer
+
+#         only_tr_tag = SoupStrainer('tr')
+#         grSoup = bs4.BeautifulSoup(res.text, 'lxml', parse_only=only_tr_tag)
+#         grText = grSoup.select('tr')
+#         # find oe number inside the page and attach it to the list oe
 
 
-        #10Y eps growth
-        try:
-            if grRegex.findall(text)[14] == 'N/A':
-                epsGrowth10y.append(
-                    grRegex.findall(text)[14])  # If it doesn't find 10y growth it looks for the 5y growth
-            else:
-                epsGrowth10y.append(grRegex.findall(text)[13])
-        except:
-            epsGrowth10y.append('')
-        print(str(len(epsGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
-            len(epsGrowth10y) / len(ticker) * 100) + '% )')
+#         grRegex = re.compile(r'(?:\+|\-|)(?<!\.)(?!0+(?:\.0+)?%)(?:\d|[1-9]\d|100)(?:(?<!100)\.\d+)|(?:N\/A)')
+
+#         text = str(grText)
+
+#         # 10Y revenue growth
+#         try:
+
+#             if grRegex.findall(text)[4] == 'N/A':
+#                 revenueGrowth10y.append(
+#                     grRegex.findall(text)[5])  # If it doesn't find 10y growth it looks for the 5y growth
+#             else:
+#                 revenueGrowth10y.append(grRegex.findall(text)[4])
+#         except:
+#             revenueGrowth10y.append('')
+#         print(str(len(revenueGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
+#             len(revenueGrowth10y) / len(ticker) * 100) + '% )')
 
 
-        #10Y fcf growth
-        try:
-            if grRegex.findall(text)[16] == 'N/A':
-                fcfGrowth10y.append(
-                    grRegex.findall(text)[17])  # If it doesn't find 10y growth it looks for the 5y growth
-            else:
-                fcfGrowth10y.append(grRegex.findall(text)[16])
-        except:
-            fcfGrowth10y.append('')
-        print(str(len(fcfGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
-            len(fcfGrowth10y) / len(ticker) * 100) + '% )')
+#         #10Y eps growth
+#         try:
+#             if grRegex.findall(text)[14] == 'N/A':
+#                 epsGrowth10y.append(
+#                     grRegex.findall(text)[14])  # If it doesn't find 10y growth it looks for the 5y growth
+#             else:
+#                 epsGrowth10y.append(grRegex.findall(text)[13])
+#         except:
+#             epsGrowth10y.append('')
+#         print(str(len(epsGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
+#             len(epsGrowth10y) / len(ticker) * 100) + '% )')
 
-        #10Y bv growth
-        try:
-            if grRegex.findall(text)[19] == 'N/A':
-                bvGrowth10y.append(
-                    grRegex.findall(text)[20])  # If it doesn't find 10y growth it looks for the 5y growth
-            else:
-                bvGrowth10y.append(grRegex.findall(text)[19])
-        except:
-            bvGrowth10y.append('')
-        print(str(len(bvGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
-            len(bvGrowth10y) / len(ticker) * 100) + '% )')
+
+#         #10Y fcf growth
+#         try:
+#             if grRegex.findall(text)[16] == 'N/A':
+#                 fcfGrowth10y.append(
+#                     grRegex.findall(text)[17])  # If it doesn't find 10y growth it looks for the 5y growth
+#             else:
+#                 fcfGrowth10y.append(grRegex.findall(text)[16])
+#         except:
+#             fcfGrowth10y.append('')
+#         print(str(len(fcfGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
+#             len(fcfGrowth10y) / len(ticker) * 100) + '% )')
+
+#         #10Y bv growth
+#         try:
+#             if grRegex.findall(text)[19] == 'N/A':
+#                 bvGrowth10y.append(
+#                     grRegex.findall(text)[20])  # If it doesn't find 10y growth it looks for the 5y growth
+#             else:
+#                 bvGrowth10y.append(grRegex.findall(text)[19])
+#         except:
+#             bvGrowth10y.append('')
+#         print(str(len(bvGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
+#             len(bvGrowth10y) / len(ticker) * 100) + '% )')
         
 #TODO: cash to asset, operating and profit margin
 def summary_catcher():
@@ -344,14 +373,30 @@ if update == 'yes':
     #1. ROIC (Return on invested capital). Measures how well a company generates cash flow relative to the capital it
     # has invested in its business. >10%
     roic = []
-    #2. 10Y Revenue (per share) Growth Rate.
+    #2. Revenue (per share) Growth Rate.
     revenueGrowth10y =[]
-    #3. 10Y EPS Growth Rate.
+    revenueGrowth5y =[]
+    #3. EPS Growth Rate.
     epsGrowth10y =[]
-    #4. 10Y Free Cash Flow (per share) Growth Rate.
+    epsGrowth5y =[]
+    #4 Ebit Growth rate
+    ebitGrowth10y =[]
+    ebitGrowth5y =[]
+    #5 EBITDA Growth rate
+    ebitdaGrowth10y =[]
+    ebitdaGrowth5y =[]
+    #6. Free Cash Flow (per share) Growth Rate.
     fcfGrowth10y=[]
-    #5. 10Y Book Value (per share) Growth Rate.
+    fcfGrowth5y=[]
+    #7. Dividend Growth rate
+    dividendGrowth10y =[]
+    dividendGrowth5y =[]
+    #7. Book Value (per share) Growth Rate.
     bvGrowth10y =[]
+    bvGrowth5y=[]
+    #8. Stock price growth
+    stockPriceGrowth10y =[]
+    stockPriceGrowth5y =[]
     #a. Enterprise Value.
     enterpriseValue = []
     #b. Owner Earnings.
@@ -410,8 +455,20 @@ data ={'Ticker': ticker,
        'Owner Earnings per Share': ownerEarnings,
        '10y Revenue Growth': revenueGrowth10y,
        '10y EPS Growth': epsGrowth10y,
+       '10y Ebit Growth': ebitGrowth10y,
+       '10y Ebitda Growth': ebitdaGrowth10y,
        '10y FCF Growth': fcfGrowth10y,
-       '10y BV Growth':bvGrowth10y,
+       '10y Dividend Growth': dividendGrowth10y,
+       '10y BV Growth': bvGrowth10y,
+       '10y Stock Price Growth': stockPriceGrowth10y,
+       '5y Revenue Growth': revenueGrowth5y,
+       '5y EPS Growth': epsGrowth5y,
+       '5y Ebit Growth': ebitGrowth5y,
+       '5y Ebitda Growth': ebitdaGrowth5y,
+       '5y FCF Growth': fcfGrowth5y,
+       '5y Dividend Growth': dividendGrowth5y,
+       '5y BV Growth': bvGrowth5y,
+       '5y Stock Price Growth': stockPriceGrowth5y,       
        'Financial & News': growthsUrl}
 
 df = pd.DataFrame(data, columns=['Ticker',
@@ -425,8 +482,20 @@ df = pd.DataFrame(data, columns=['Ticker',
                                  'Owner Earnings per Share',
                                  '10y Revenue Growth',
                                  '10y EPS Growth',
+                                 '10y Ebit Growth',
+                                 '10y Ebitda Growth',
                                  '10y FCF Growth',
+                                 '10y Dividend Growth',
                                  '10y BV Growth',
+                                 '10y Stock Price Growth',
+                                 '5y Revenue Growth',
+                                 '5y EPS Growth',
+                                 '5y Ebit Growth',
+                                 '5y Ebitda Growth',
+                                 '5y FCF Growth',
+                                 '5y Dividend Growth',
+                                 '5y BV Growth',
+                                 '5y Stock Price Growth',
                                  'Financial & News'], index=ticker)
 #Replace values
 df['ROIC (in %)' ]=df['ROIC (in %)'].replace({'\%':''}, regex = True) # or use this code: list(map(lambda x: x[:-1], df['ROIC (in %)'].values))
