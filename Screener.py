@@ -18,6 +18,11 @@ import pickle
 import pandas as pd
 import yfinance as yf
 import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+#pip install webdriver-manager
+from webdriver_manager.chrome import ChromeDriverManager
+
 
 ##########################################DATABASE IMPORT#########################################################
 
@@ -45,7 +50,10 @@ capitalization = stocks['Market Cap'].to_list()
 print('Ticker list created with ' + str(len(ticker))+ ' elements')
 print('Collecting URLs...')
 print('Setting up requests session (maybe you will go faster)...')
+
 s=requests.Session() #Setting up session for Requests (it seems to speed up a litte the process)
+#TODO: Setup session for selenium
+driver = webdriver.Chrome(ChromeDriverManager().install())
 
 #Storing URLs
 evUrl = list([])
@@ -156,7 +164,24 @@ def ro_catcher():
             roic.append('')
         print(str(len(roic)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
             len(roic) / len(ticker) * 100) + '% )')
+
+#NEW GROWTH NUMBERS 
+def gr_catcher2():
+    for u in growthsUrl[len(revenueGrowth10y):len(growthsUrl)]:
+        gr_numbers_10y = list([])
+        gr_numbers_5y = list([])
+        driver.get(u)
+        for i in range(1,9): 
+            #Finds 10y Revenue, EPS, EBIT, EBITDA, FCF, Dividends, BV, Totale Return from stock
+            gr_numbers_10y.append(driver.find_element(By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody/tr['+str(i)+']/td[2]').text)
+            #Finds 10y Revenue, EPS, EBIT, EBITDA, FCF, Dividends, BV, Totale Return from stock
+            gr_numbers_5y.append(driver.find_element(By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody/tr['+str(i)+']/td[3]').text)
+        print()
         
+
+
+
+
 #Retrieve Growth numbers
 def gr_catcher():
     for u in growthsUrl[len(revenueGrowth10y):len(growthsUrl)]:
