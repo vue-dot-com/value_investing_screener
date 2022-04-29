@@ -41,6 +41,7 @@ driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=chrome
 nyse = pd.read_csv('NYSE.csv')
 nasdaq = pd.read_csv('NASDAQ.csv')
 stocks = pd.merge(nyse, nasdaq, how="outer")
+stocks=stocks.iloc[0:10,]
 
 #TODO: Code for downloading ticker prices. Example yfinance.download(ticker, threads=false, period=1d)
 #creating ticker list
@@ -172,6 +173,7 @@ def ro_catcher():
 
 #NEW GROWTH NUMBERS 
 def gr_catcher():
+    global driver
     for u in growthsUrl[len(revenueGrowth10y):len(growthsUrl)]:
         gr_numbers_10y = list([])
         gr_numbers_5y = list([])
@@ -249,7 +251,10 @@ def gr_catcher():
                 else:
                     stockPriceGrowth10y.append(gr_numbers_10y[i-1])
                     stockPriceGrowth5y.append(gr_numbers_5y[i-1])
-        #driver.close() #Closes current webpage, raises invalid session id exception
+        if len(revenueGrowth10y) % 10 == 0:
+            driver.quit() #Closes current webpage
+            #Instatiate new webpage
+            driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=chrome_options)
         print(str(len(revenueGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
             len(revenueGrowth10y) / len(ticker) * 100) + '% )')
     driver.quit() #Closes the browser
