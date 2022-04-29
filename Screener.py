@@ -7,9 +7,6 @@ Please, very humbly I made this available to anyone who wants to use and collabo
 I hope you will enjoy. 
 
 """
-
-
-import csv, os
 import requests
 import bs4
 import re
@@ -20,7 +17,17 @@ import yfinance as yf
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
+
+#Setup selenium session
+chrome_options = Options()
+chrome_options.add_argument("--headless") #With this option the browser does not open every time
+driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=chrome_options)
+
 
 
 ##########################################DATABASE IMPORT#########################################################
@@ -34,6 +41,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 nyse = pd.read_csv('NYSE.csv')
 nasdaq = pd.read_csv('NASDAQ.csv')
 stocks = pd.merge(nyse, nasdaq, how="outer")
+
 #TODO: Code for downloading ticker prices. Example yfinance.download(ticker, threads=false, period=1d)
 #creating ticker list
 
@@ -51,12 +59,6 @@ print('Collecting URLs...')
 print('Setting up requests session (maybe you will go faster)...')
 
 s=requests.Session() #Setting up session for Requests (it seems to speed up a litte the process)
-
-#Setup session for selenium
-from selenium.webdriver.chrome.options import Options
-chrome_options = Options()
-chrome_options.set_headless() #With this option the browser does not open every time
-driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=chrome_options)
 
 #Storing URLs
 evUrl = list([])
@@ -170,46 +172,87 @@ def ro_catcher():
 
 #NEW GROWTH NUMBERS 
 def gr_catcher():
-    gr_numbers_10y = list([])
-    gr_numbers_5y = list([])
     for u in growthsUrl[len(revenueGrowth10y):len(growthsUrl)]:
+        gr_numbers_10y = list([])
+        gr_numbers_5y = list([])
+        execute_next = True
         #Selenium request
         driver.get(u)
-        time.sleep(10) #Allows the page to load correctly so that it can locate the below XPATHs
-        for i in range(1,9):
-            #Finds 10y Revenue, EPS, EBIT, EBITDA, FCF, Dividends, BV, Totale Return from stock
-            gr_numbers_10y.append(driver.find_element(By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody/tr['+str(i)+']/td[2]').text)
-            #Finds 10y Revenue, EPS, EBIT, EBITDA, FCF, Dividends, BV, Totale Return from stock
-            gr_numbers_5y.append(driver.find_element(By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody/tr['+str(i)+']/td[3]').text)
-            
-            #Allocation
-            if i==1:
-                revenueGrowth10y.append(gr_numbers_10y[i-1])
-                revenueGrowth5y.append(gr_numbers_5y[i-1])
-            elif i==2:
-                epsGrowth10y.append(gr_numbers_10y[i-1])
-                epsGrowth5y.append(gr_numbers_5y[i-1])
-            elif i==3:
-                ebitGrowth10y.append(gr_numbers_10y[i-1])
-                ebitGrowth5y.append(gr_numbers_5y[i-1])
-            elif i==4:
-                ebitdaGrowth10y.append(gr_numbers_10y[i-1])
-                ebitdaGrowth5y.append(gr_numbers_5y[i-1])
-            elif i==5:
-                fcfGrowth10y.append(gr_numbers_10y[i-1])
-                fcfGrowth5y.append(gr_numbers_5y[i-1])
-            elif i==6:
-                dividendGrowth10y.append(gr_numbers_10y[i-1])
-                dividendGrowth5y.append(gr_numbers_5y[i-1])
-            elif i==7:
-                bvGrowth10y.append(gr_numbers_10y[i-1])
-                bvGrowth5y.append(gr_numbers_5y[i-1])
-            else:
-                stockPriceGrowth10y.append(gr_numbers_10y[i-1])
-                stockPriceGrowth5y.append(gr_numbers_5y[i-1])
+        timeout = 10
+        try:
+            element_present = EC.presence_of_element_located((By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody'))
+            WebDriverWait(driver, timeout).until(element_present) #Allows the page to load correctly so that it can locate the below XPATHs
+        except TimeoutException:
+            for i in range(1,9):
+                gr_numbers_10y.append('')
+                gr_numbers_5y.append('')
+                if i==1:
+                    revenueGrowth10y.append(gr_numbers_10y[i-1])
+                    revenueGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==2:
+                    epsGrowth10y.append(gr_numbers_10y[i-1])
+                    epsGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==3:
+                    ebitGrowth10y.append(gr_numbers_10y[i-1])
+                    ebitGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==4:
+                    ebitdaGrowth10y.append(gr_numbers_10y[i-1])
+                    ebitdaGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==5:
+                    fcfGrowth10y.append(gr_numbers_10y[i-1])
+                    fcfGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==6:
+                    dividendGrowth10y.append(gr_numbers_10y[i-1])
+                    dividendGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==7:
+                    bvGrowth10y.append(gr_numbers_10y[i-1])
+                    bvGrowth5y.append(gr_numbers_5y[i-1])
+                else:
+                    stockPriceGrowth10y.append(gr_numbers_10y[i-1])
+                    stockPriceGrowth5y.append(gr_numbers_5y[i-1])
+                execute_next=False
+        if execute_next==False:
+            print('page not loaded') 
+            pass #Do not need to execute the for loop below
+        else:        
+            for i in range(1,9):
+                try:
+                    #Finds 10y Revenue, EPS, EBIT, EBITDA, FCF, Dividends, BV, Totale Return from stock
+                    gr_numbers_10y.append(driver.find_element(By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody/tr['+str(i)+']/td[2]').text)
+                    #Finds 10y Revenue, EPS, EBIT, EBITDA, FCF, Dividends, BV, Totale Return from stock
+                    gr_numbers_5y.append(driver.find_element(By.XPATH, '//*[@id="stock-page-container"]/main/div[2]/div/div/div[1]/div/div[1]/div/div[1]/table/tbody/tr['+str(i)+']/td[3]').text)
+                except NoSuchElementException: #In case it does not locate the element
+                    gr_numbers_10y.append('')
+                    gr_numbers_5y.append('')  
+                #Allocation
+                if i==1:
+                    revenueGrowth10y.append(gr_numbers_10y[i-1])
+                    revenueGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==2:
+                    epsGrowth10y.append(gr_numbers_10y[i-1])
+                    epsGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==3:
+                    ebitGrowth10y.append(gr_numbers_10y[i-1])
+                    ebitGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==4:
+                    ebitdaGrowth10y.append(gr_numbers_10y[i-1])
+                    ebitdaGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==5:
+                    fcfGrowth10y.append(gr_numbers_10y[i-1])
+                    fcfGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==6:
+                    dividendGrowth10y.append(gr_numbers_10y[i-1])
+                    dividendGrowth5y.append(gr_numbers_5y[i-1])
+                elif i==7:
+                    bvGrowth10y.append(gr_numbers_10y[i-1])
+                    bvGrowth5y.append(gr_numbers_5y[i-1])
+                else:
+                    stockPriceGrowth10y.append(gr_numbers_10y[i-1])
+                    stockPriceGrowth5y.append(gr_numbers_5y[i-1])
+        #driver.close() #Closes current webpage, raises invalid session id exception
         print(str(len(revenueGrowth10y)) + ' / ' + str(len(ticker)) + ' Done. ' + '( ' + str(
             len(revenueGrowth10y) / len(ticker) * 100) + '% )')
-       
+    driver.quit() #Closes the browser
         
 # #Retrieve Growth numbers
 # def gr_catcher():
@@ -478,8 +521,8 @@ df = pd.DataFrame(data, columns=['Ticker',
                                  'Price',
                                  'Market Cap',
                                  'Enterprise Value (in Mill.)',
-                                 'ROIC (in %)',
                                  'Owner Earnings per Share',
+                                 'ROIC (in %)',
                                  '10y Revenue Growth',
                                  '10y EPS Growth',
                                  '10y Ebit Growth',
@@ -497,34 +540,21 @@ df = pd.DataFrame(data, columns=['Ticker',
                                  '5y BV Growth',
                                  '5y Stock Price Growth',
                                  'Financial & News'], index=ticker)
-#Replace values
-df['ROIC (in %)' ]=df['ROIC (in %)'].replace({'\%':''}, regex = True) # or use this code: list(map(lambda x: x[:-1], df['ROIC (in %)'].values))
-df['10y Revenue Growth'] = df['10y Revenue Growth'].replace({'N\/A':''}, regex= True)
-df['10y EPS Growth'] = df['10y EPS Growth'].replace({'N\/A':''}, regex= True)
-df['10y FCF Growth'] = df['10y FCF Growth'].replace({'N\/A':''}, regex= True)
-df['10y BV Growth'] = df['10y BV Growth'].replace({'N\/A':''}, regex= True)
-#Convert dollar values into numeric
-df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\$':''}, regex = True)
-df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\,':''}, regex = True)
+
+#Replace values like %, NA, /, -, $
+df.loc[:,"ROIC (in %)":"5y Stock Price Growth"]=df.loc[:,"ROIC (in %)":"5y Stock Price Growth"].replace({'N\/A':'', '\-':'', '\%':''}, regex= True)
+df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\$':'', '\,':''}, regex = True)
 df['Price'] = df['Price'].replace({'\$':''}, regex = True)
+
 #Convert into numeric
-df['Owner Earnings per Share'] = pd.to_numeric(df['Owner Earnings per Share'])
-df['Enterprise Value (in Mill.)'] = pd.to_numeric(df['Enterprise Value (in Mill.)'])
-df['Price'] = pd.to_numeric(df['Price'])
-df['Market Cap'] = pd.to_numeric(df['Market Cap'])
-df['ROIC (in %)'] = pd.to_numeric(df['ROIC (in %)'])
-df['10y Revenue Growth'] = pd.to_numeric(df['10y Revenue Growth'])
-df['10y EPS Growth'] = pd.to_numeric(df['10y EPS Growth'])
-df['10y FCF Growth'] = pd.to_numeric(df['10y FCF Growth'])
-df['10y BV Growth'] = pd.to_numeric(df['10y BV Growth'])
+df.loc[:,"Price":"5y Stock Price Growth"] = df.loc[:,"Price":"5y Stock Price Growth"].apply(pd.to_numeric)
 
 #Creating Ten Cap variable
-tenCap = df['Owner Earnings per Share']*10
-df.insert(12, 'Ten Cap Valuation', tenCap)
+df.insert(df.shape[1]-1, 'Ten Cap Valuation', df['Owner Earnings per Share']*10)
 df['Ten Cap Valuation'] = pd.to_numeric(df['Ten Cap Valuation'])
 
 #Save .csv
-df.to_csv('Screener.csv', index=False, sep=';')
+df.fillna('').to_csv('Screener.csv', index=False, sep=';')
 print(r'CSV file called ''Screener'' created')
 
 
