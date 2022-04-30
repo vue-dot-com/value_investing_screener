@@ -41,7 +41,7 @@ driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=chrome
 nyse = pd.read_csv('NYSE.csv')
 nasdaq = pd.read_csv('NASDAQ.csv')
 stocks = pd.merge(nyse, nasdaq, how="outer")
-stocks=stocks.iloc[0:10,]
+
 
 #TODO: Code for downloading ticker prices. Example yfinance.download(ticker, threads=false, period=1d)
 #creating ticker list
@@ -461,13 +461,13 @@ if update == 'yes':
 
 #Save data into pickle file
     with open('Newobjs.pickle', 'wb') as f: # Python 2: open(...,'w')
-        pickle.dump([quote, roic, enterpriseValue, ownerEarnings, revenueGrowth10y, epsGrowth10y, fcfGrowth10y, bvGrowth10y], f)
+        pickle.dump([quote, roic, revenueGrowth10y, revenueGrowth5y, epsGrowth10y, epsGrowth5y, ebitGrowth10y, ebitGrowth5y, ebitdaGrowth10y, ebitdaGrowth5y, fcfGrowth10y, fcfGrowth5y, dividendGrowth10y, dividendGrowth5y, bvGrowth10y, bvGrowth5y, stockPriceGrowth10y, stockPriceGrowth5y, enterpriseValue, ownerEarnings], f)
 
     print('Objects saved in the pickle file')
 
 elif update == 'restart':
     with open('Newobjs.pickle', 'rb') as f:  # Python 3: open(..., 'rb')
-        quote, roic, enterpriseValue, ownerEarnings, revenueGrowth10y, epsGrowth10y, fcfGrowth10y, bvGrowth10y = pickle.load(f)
+        quote, roic, revenueGrowth10y, revenueGrowth5y, epsGrowth10y, epsGrowth5y, ebitGrowth10y, ebitGrowth5y, ebitdaGrowth10y, ebitdaGrowth5y, fcfGrowth10y, fcfGrowth5y, dividendGrowth10y, dividendGrowth5y, bvGrowth10y, bvGrowth5y, stockPriceGrowth10y, stockPriceGrowth5y, enterpriseValue, ownerEarnings  = pickle.load(f)
 
     print('Objects loaded, re-starting the download process where it ended')
 
@@ -476,14 +476,14 @@ elif update == 'restart':
     print('Download ended')
 
     with open('Newobjs.pickle', 'wb') as f: # Python 2: open(...,'w')
-        pickle.dump([quote, roic, enterpriseValue, ownerEarnings, revenueGrowth10y, epsGrowth10y, fcfGrowth10y, bvGrowth10y], f)
+        pickle.dump([quote, roic, revenueGrowth10y, revenueGrowth5y, epsGrowth10y, epsGrowth5y, ebitGrowth10y, ebitGrowth5y, ebitdaGrowth10y, ebitdaGrowth5y, fcfGrowth10y, fcfGrowth5y, dividendGrowth10y, dividendGrowth5y, bvGrowth10y, bvGrowth5y, stockPriceGrowth10y, stockPriceGrowth5y, enterpriseValue, ownerEarnings], f)
 
     print('Objects save in pickle file')
 
 else:
     import pickle
     with open('Newobjs.pickle', 'rb') as f:  # Python 3: open(..., 'rb')
-        quote, roic, enterpriseValue, ownerEarnings,revenueGrowth10y, epsGrowth10y, fcfGrowth10y, bvGrowth10y = pickle.load(f)
+        quote, roic, revenueGrowth10y, revenueGrowth5y, epsGrowth10y, epsGrowth5y, ebitGrowth10y, ebitGrowth5y, ebitdaGrowth10y, ebitdaGrowth5y, fcfGrowth10y, fcfGrowth5y, dividendGrowth10y, dividendGrowth5y, bvGrowth10y, bvGrowth5y, stockPriceGrowth10y, stockPriceGrowth5y, enterpriseValue, ownerEarnings = pickle.load(f)
 
     #load those URLs to put in the CSV file
     print('ROIC numbers are loaded and unchanged. Remember it is useful to update at least twice a year.')
@@ -497,7 +497,7 @@ data ={'Ticker': ticker,
        'Sector': sector,
        'Industry': industry,
        'Price': quote,
-       'Enterprise Value (in Mill.)': enterpriseValue,
+       #'Enterprise Value (in Mill.)': enterpriseValue,
        'Market Cap': capitalization,
        'ROIC (in %)': roic,
        'Owner Earnings per Share': ownerEarnings,
@@ -525,7 +525,7 @@ df = pd.DataFrame(data, columns=['Ticker',
                                  'Industry',
                                  'Price',
                                  'Market Cap',
-                                 'Enterprise Value (in Mill.)',
+                                 #'Enterprise Value (in Mill.)',
                                  'Owner Earnings per Share',
                                  'ROIC (in %)',
                                  '10y Revenue Growth',
@@ -548,7 +548,7 @@ df = pd.DataFrame(data, columns=['Ticker',
 
 #Replace values like %, NA, /, -, $
 df.loc[:,"ROIC (in %)":"5y Stock Price Growth"]=df.loc[:,"ROIC (in %)":"5y Stock Price Growth"].replace({'N\/A':'', '\-':'', '\%':''}, regex= True)
-df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\$':'', '\,':''}, regex = True)
+#df['Enterprise Value (in Mill.)'] = df['Enterprise Value (in Mill.)'].replace({'\$':'', '\,':''}, regex = True)
 df['Price'] = df['Price'].replace({'\$':''}, regex = True)
 
 #Convert into numeric
