@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -34,13 +32,10 @@ type GrowthData struct {
 	StockPriceGrowth5Y  string
 }
 
-func GrowthCatcher(browser *rod.Browser, tickers []string, maxConcurrency int) map[string]GrowthData {
+func GrowthCatcher(browser *rod.Browser, pool rod.Pool[*rod.Page], ticker string) map[string]GrowthData {
 	result := make(map[string]GrowthData)
-	pool := rod.NewPagePool(maxConcurrency)
-	var counter int32
-	var mu sync.Mutex
 
-	create := func() *rod.Page {
+	create := func() **rod.Page {
 		page := browser.MustIncognito().MustPage()
 
 		// Disable CSS and images
@@ -61,18 +56,17 @@ func GrowthCatcher(browser *rod.Browser, tickers []string, maxConcurrency int) m
 		page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
 			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
 		})
-		return page
+
+		return &page
 	}
 
 	job := func(ticker string) {
-		defer pool.Put(pool.MustGet(create))
-		mu.Lock()
-		defer mu.Unlock()
-
+		page := pool.MustGet(create)
+		defer pool.Put(page)
 		var grData GrowthData
 		var err error
 		for attempts := 0; attempts < 3; attempts++ {
-			grData, err = scrapeGrowthData(pool.MustGet(create), ticker)
+			grData, err = scrapeGrowthData(*page, ticker)
 			if err == nil {
 				break
 			}
@@ -87,21 +81,12 @@ func GrowthCatcher(browser *rod.Browser, tickers []string, maxConcurrency int) m
 			result[ticker] = grData
 		}
 
-		atomic.AddInt32(&counter, 1)
-		fmt.Printf("Processed %d/%d tickers\n", atomic.LoadInt32(&counter), len(tickers))
 	}
 
-	var wg sync.WaitGroup
-	for _, ticker := range tickers {
-		wg.Add(1)
-		go func(ticker string) {
-			defer wg.Done()
-			job(ticker)
-		}(ticker)
-	}
-
-	wg.Wait()
-	pool.Cleanup(func(p *rod.Page) { p.MustClose() })
+	job(ticker)
+	pool.Cleanup(func(p **rod.Page) {
+		(*p).MustClose() // Dereference **rod.Page to get *rod.Page and call MustClose
+	})
 	return result
 }
 
@@ -110,7 +95,7 @@ func scrapeGrowthData(page *rod.Page, ticker string) (GrowthData, error) {
 
 	pageURL := strings.ReplaceAll(URL, "{STOCK}", ticker)
 	err := rod.Try(func() {
-		page.Timeout(10 * time.Second).MustNavigate(pageURL).MustWaitLoad()
+		page.Timeout(60 * time.Second).MustNavigate(pageURL).MustWaitLoad().MustElement(TAG)
 	})
 	if err != nil {
 		return grData, fmt.Errorf("failed to navigate to %s: %v", pageURL, err)

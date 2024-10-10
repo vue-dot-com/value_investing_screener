@@ -5,8 +5,6 @@ import (
 	"log"
 	"regexp"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -18,15 +16,11 @@ const TAG string = `font[style="font-size: 24px; font-weight: 700; color: #337ab
 const REGEX string = `(\$\d+([,\.]\d+)?\d+([,\.]\d+)?k?)`
 const FUNCTION string = "Enterprise Value"
 
-func GetEnterpriseValue(browser *rod.Browser, tickers []string, maxConcurrency int) map[string]string {
-	log.Print("In function for ", FUNCTION)
+func GetEnterpriseValue(browser *rod.Browser, pool rod.Pool[*rod.Page], ticker string) map[string]string {
 	result := make(map[string]string)
 	regex := regexp.MustCompile(REGEX)
-	pool := rod.NewPagePool(maxConcurrency)
-	var counter int32
-	var mu sync.Mutex
 
-	create := func() *rod.Page {
+	create := func() **rod.Page {
 		page := browser.MustIncognito().MustPage()
 
 		// Disable CSS and images
@@ -48,18 +42,16 @@ func GetEnterpriseValue(browser *rod.Browser, tickers []string, maxConcurrency i
 			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
 		})
 
-		return page
+		return &page
 	}
 
 	job := func(ticker string) {
-		defer pool.Put(pool.MustGet(create))
-		mu.Lock()
-		defer mu.Unlock()
-
+		page := pool.MustGet(create)
+		defer pool.Put(page)
 		var value string
 		var err error
 		for attempts := 0; attempts < 3; attempts++ {
-			value, err = scrapeEnterpriseValue(pool.MustGet(create), ticker, regex)
+			value, err = scrapeEnterpriseValue(*page, ticker, regex)
 			if err == nil {
 				break
 			}
@@ -72,29 +64,19 @@ func GetEnterpriseValue(browser *rod.Browser, tickers []string, maxConcurrency i
 		} else {
 			result[ticker] = value
 		}
-
-		atomic.AddInt32(&counter, 1)
-		fmt.Printf("%s Processed %d/%d tickers\n", FUNCTION, atomic.LoadInt32(&counter), len(tickers))
 	}
 
-	var wg sync.WaitGroup
-	for _, ticker := range tickers {
-		wg.Add(1)
-		go func(ticker string) {
-			defer wg.Done()
-			job(ticker)
-		}(ticker)
-	}
-
-	wg.Wait()
-	pool.Cleanup(func(p *rod.Page) { p.MustClose() })
+	job(ticker)
+	pool.Cleanup(func(p **rod.Page) {
+		(*p).MustClose() // Dereference **rod.Page to get *rod.Page and call MustClose
+	})
 	return result
 }
 
 func scrapeEnterpriseValue(page *rod.Page, ticker string, regex *regexp.Regexp) (string, error) {
 	pageURL := strings.ReplaceAll(URL, "{STOCK}", ticker)
 	err := rod.Try(func() {
-		page.MustNavigate(pageURL).MustWaitLoad()
+		page.MustNavigate(pageURL).MustWaitLoad().MustWaitStable()
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to navigate to %s: %v", pageURL, err)

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -22,7 +23,9 @@ import (
 func main() {
 	// Map to store results for each ticker
 	tickerResults := make(map[string]models.TickerData)
-
+	var mu sync.Mutex // Mutex to protect shared access to tickerResults
+	// Initialize counter
+	var counter int32
 	// Read csv and merge results
 	tickerInfoNasdaq, _ := readCSVFile("NASDAQ.csv")
 	tickerInfoNyse, _ := readCSVFile("NYSE.csv")
@@ -35,8 +38,7 @@ func main() {
 		tickers = append(tickers, ticker)
 	}
 
-	tickers = tickers[:5]
-
+	tickers = tickers[:10]
 	log.Print("tickers are", tickers)
 
 	// Launch the browser once for all scraping functions
@@ -44,82 +46,101 @@ func main() {
 	browser := rod.New().ControlURL(u).MustConnect()
 	defer browser.MustClose()
 
-	// Set max concurrency (e.g., 10 concurrent requests)
-	maxConcurrency := 2
+	maxConcurrency := 30
+	// Create a pool
+	pool := rod.NewPool[*rod.Page](maxConcurrency)
+	// Create a semaphore with a buffer to limit concurrency (e.g., 5)
+	semaphore := make(chan struct{}, maxConcurrency)
 
-	// Use a WaitGroup to wait for all goroutines to finish
-	var wg sync.WaitGroup
+	// Use an outer WaitGroup to wait for all tickers routines to finish in this way we can increment the counter in the for loop
+	var outerWg sync.WaitGroup
+	outerWg.Add(len(tickers))
 
-	// Use channels to collect results from goroutines
-	priceChan := make(chan map[string]string)
-	enterpriseValueChan := make(chan map[string]string)
-	roicChan := make(chan map[string]string)
-	ownerEarningsChan := make(chan map[string]string)
-	growthDataChan := make(chan map[string]growthnumbers.GrowthData)
-
-	// Start goroutines for each scraping function
-	wg.Add(5)
-
-	go func() {
-		wg.Wait()
-		close(priceChan)
-		close(enterpriseValueChan)
-		close(roicChan)
-		close(ownerEarningsChan)
-		close(growthDataChan)
-	}()
-
-	go func() {
-		defer wg.Done()
-		log.Print("In Price catcher")
-		action := "fast_info[lastPrice]"
-		priceChan <- price.GetStockPrice(tickers, action, maxConcurrency)
-	}()
-
-	go func() {
-		defer wg.Done()
-		log.Print("In enterprise value catcher")
-		enterpriseValueChan <- enterprisevalue.GetEnterpriseValue(browser, tickers, maxConcurrency)
-	}()
-
-	go func() {
-		defer wg.Done()
-		log.Print("In roic catcher")
-		roicChan <- roic.GetRoic(browser, tickers, maxConcurrency)
-
-	}()
-
-	go func() {
-		defer wg.Done()
-		log.Print("In owner earnings catcher")
-		ownerEarningsChan <- ownerearnings.GetOwnerEarnings(browser, tickers, maxConcurrency)
-
-	}()
-
-	go func() {
-		defer wg.Done()
-		log.Print("In growth data catcher")
-		growthDataChan <- growthnumbers.GrowthCatcher(browser, tickers, maxConcurrency)
-	}()
-
-	// Collect results from channels
-	price := <-priceChan
-	enterpriseValue := <-enterpriseValueChan
-	roicData := <-roicChan
-	ownerEarnings := <-ownerEarningsChan
-	growthData := <-growthDataChan
-
-	// Populate the struct for each ticker
 	for _, ticker := range tickers {
-		tickerResults[ticker] = models.TickerData{
-			TickerInfo:      tickerInfo[ticker],
-			LastPrice:       price[ticker],
-			EnterpriseValue: enterpriseValue[ticker],
-			Roic:            roicData[ticker],
-			OwnerEarnings:   ownerEarnings[ticker],
-			GrowthData:      growthData[ticker],
-		}
+
+		// Use a WaitGroup to wait for all goroutines to finish
+		var wg sync.WaitGroup
+		wg.Add(5) // Add 5 for each ticker since you're spawning 5 goroutines
+
+		go func(ticker string) {
+			defer wg.Done()
+
+			// Acquire a slot in the semaphore
+			semaphore <- struct{}{}
+			defer func() {
+				// Release the slot
+				<-semaphore
+			}()
+
+			action := "fast_info[lastPrice]"
+			priceData := price.GetStockPrice(ticker, action)
+
+			mu.Lock()
+			defer mu.Unlock()
+			tickerResults[ticker] = models.TickerData{
+				TickerInfo: tickerInfo[ticker],
+				LastPrice:  priceData[ticker],
+			}
+		}(ticker)
+
+		go func(ticker string) {
+			defer wg.Done()
+			enterpriseValueData := enterprisevalue.GetEnterpriseValue(browser, pool, ticker)
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker]
+			result.EnterpriseValue = enterpriseValueData[ticker]
+			tickerResults[ticker] = result
+		}(ticker)
+
+		go func(ticker string) {
+			defer wg.Done()
+			roicData := roic.GetRoic(browser, pool, ticker)
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker]
+			result.Roic = roicData[ticker]
+			tickerResults[ticker] = result
+
+		}(ticker)
+
+		go func(ticker string) {
+			defer wg.Done()
+			ownerEarningsData := ownerearnings.GetOwnerEarnings(browser, pool, ticker)
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker]
+			result.OwnerEarnings = ownerEarningsData[ticker]
+			tickerResults[ticker] = result
+		}(ticker)
+
+		go func(ticker string) {
+			defer wg.Done()
+			growthData := growthnumbers.GrowthCatcher(browser, pool, ticker)
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker]
+			result.GrowthData = growthData[ticker]
+			tickerResults[ticker] = result
+
+		}(ticker)
+
+		go func() {
+			wg.Wait()
+			atomic.AddInt32(&counter, 1)
+			fmt.Printf("Processed %d/%d tickers\n", atomic.LoadInt32(&counter), len(tickers))
+			// Mark this iteration as done in the outer WaitGroup
+			outerWg.Done()
+		}()
+
 	}
+
+	// Wait for all iterations (and their goroutines) to complete
+	outerWg.Wait()
 
 	// Save to CSV
 	log.Print("Saving data to csv file")
@@ -219,32 +240,7 @@ func saveToCSV(filePath string, data map[string]models.TickerData) error {
 
 	// Write the header
 	header := []string{
-		"Ticker",
-		"Name",
-		"IPO Year",
-		"Country",
-		"Sector",
-		"Industry",
-		"Price",
-		"Enterprise Value",
-		"ROIC",
-		"Owner Earnings",
-		"RevenueGrowth10Y",
-		"RevenueGrowth5Y",
-		"EpsGrowth10Y",
-		"EpsGrowth5Y",
-		"EbitGrowth10Y",
-		"EbitGrowth5Y",
-		"EbitdaGrowth10Y",
-		"EbitdaGrowth5Y",
-		"FcfGrowth10Y",
-		"FcfGrowth5Y",
-		"DividendGrowth10Y",
-		"DividendGrowth5Y",
-		"BvGrowth10Y",
-		"BvGrowth5Y",
-		"StockPriceGrowth10Y",
-		"StockPriceGrowth5Y"}
+		"Ticker", "Name", "IPO Year", "Country", "Sector", "Industry", "Price", "Enterprise Value", "ROIC", "Owner Earnings", "RevenueGrowth10Y", "RevenueGrowth5Y", "EpsGrowth10Y", "EpsGrowth5Y", "EbitGrowth10Y", "EbitGrowth5Y", "EbitdaGrowth10Y", "EbitdaGrowth5Y", "FcfGrowth10Y", "FcfGrowth5Y", "DividendGrowth10Y", "DividendGrowth5Y", "BvGrowth10Y", "BvGrowth5Y", "StockPriceGrowth10Y", "StockPriceGrowth5Y"}
 
 	if err := writer.Write(header); err != nil {
 		return err
