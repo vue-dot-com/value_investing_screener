@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -38,15 +39,12 @@ func main() {
 		tickers = append(tickers, ticker)
 	}
 
-	tickers = tickers[:10]
-	log.Print("tickers are", tickers)
-
 	// Launch the browser once for all scraping functions
 	u := launcher.New().Headless(true).MustLaunch()
 	browser := rod.New().ControlURL(u).MustConnect()
 	defer browser.MustClose()
 
-	maxConcurrency := 30
+	maxConcurrency := 5
 	// Create a pool
 	pool := rod.NewPool[*rod.Page](maxConcurrency)
 	// Create a semaphore with a buffer to limit concurrency (e.g., 5)
@@ -221,6 +219,21 @@ func mergeTickerInfoMaps(map1, map2 map[string]models.TickerInfo) map[string]mod
 	// Copy key-value pairs from map2 into mergedMap
 	for key, value := range map2 {
 		mergedMap[key] = value // This will overwrite the key if it exists in both maps
+	}
+
+	// Delete any ticker that contains "^" since it might indicate preferred shares or trusts etc.
+	// Delete any ticker that contains "warrant" since it might indicate warrants.
+	// Delete any ticker that contains "preferred" since it might indicate preferred stock and underlying company is covered in main ticker.
+	for symbol := range mergedMap {
+		if strings.Contains(symbol, "^") {
+			delete(mergedMap, symbol)
+		}
+		if strings.Contains(strings.ToLower(mergedMap[symbol].Name), "warrant") {
+			delete(mergedMap, symbol)
+		}
+		if strings.Contains(strings.ToLower(mergedMap[symbol].Name), "preferred") {
+			delete(mergedMap, symbol)
+		}
 	}
 
 	return mergedMap

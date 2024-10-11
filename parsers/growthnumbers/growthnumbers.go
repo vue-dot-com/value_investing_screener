@@ -12,6 +12,7 @@ import (
 
 const URL string = "https://www.gurufocus.com/stock/{STOCK}/financials"
 const TAG string = `tbody[data-v-217973d7]`
+const RETRIES int = 1
 
 type GrowthData struct {
 	RevenueGrowth10Y    string
@@ -65,7 +66,7 @@ func GrowthCatcher(browser *rod.Browser, pool rod.Pool[*rod.Page], ticker string
 		defer pool.Put(page)
 		var grData GrowthData
 		var err error
-		for attempts := 0; attempts < 3; attempts++ {
+		for attempts := 0; attempts < RETRIES; attempts++ {
 			grData, err = scrapeGrowthData(*page, ticker)
 			if err == nil {
 				break

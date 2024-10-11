@@ -15,6 +15,7 @@ const URL string = "https://www.gurufocus.com/term/owner-earnings/{STOCK}"
 const TAG string = `font[style="font-size: 24px; font-weight: 700; color: #337ab7"]`
 const REGEX string = `[+-]?(?:\d{1,3})(?:\.\d+)?`
 const FUNCTION string = "Owner Earnings"
+const RETRIES int = 1
 
 // GetOwnerEarnings returns the owner earnings for each ticker
 func GetOwnerEarnings(browser *rod.Browser, pool rod.Pool[*rod.Page], ticker string) map[string]string {
@@ -50,7 +51,7 @@ func GetOwnerEarnings(browser *rod.Browser, pool rod.Pool[*rod.Page], ticker str
 		defer pool.Put(page)
 		var value string
 		var err error
-		for attempts := 0; attempts < 3; attempts++ {
+		for attempts := 0; attempts < RETRIES; attempts++ {
 			value, err = scrapeOwnerEarnings(*page, ticker, regex)
 			if err == nil {
 				break

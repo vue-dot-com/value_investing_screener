@@ -15,6 +15,7 @@ const URL string = "https://www.gurufocus.com/term/enterprise-value/{STOCK}"
 const TAG string = `font[style="font-size: 24px; font-weight: 700; color: #337ab7"]`
 const REGEX string = `(\$\d+([,\.]\d+)?\d+([,\.]\d+)?k?)`
 const FUNCTION string = "Enterprise Value"
+const RETRIES int = 1
 
 func GetEnterpriseValue(browser *rod.Browser, pool rod.Pool[*rod.Page], ticker string) map[string]string {
 	result := make(map[string]string)
@@ -50,7 +51,7 @@ func GetEnterpriseValue(browser *rod.Browser, pool rod.Pool[*rod.Page], ticker s
 		defer pool.Put(page)
 		var value string
 		var err error
-		for attempts := 0; attempts < 3; attempts++ {
+		for attempts := 0; attempts < RETRIES; attempts++ {
 			value, err = scrapeEnterpriseValue(*page, ticker, regex)
 			if err == nil {
 				break
