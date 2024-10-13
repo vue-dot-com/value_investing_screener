@@ -9,9 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
+	"time"
 
 	"github.com/vue-dot-com/value_investing_screener/models"
 	"github.com/vue-dot-com/value_investing_screener/parsers/enterprisevalue"
@@ -22,6 +20,8 @@ import (
 )
 
 func main() {
+	defer timer("main")()
+
 	// Map to store results for each ticker
 	tickerResults := make(map[string]models.TickerData)
 	var mu sync.Mutex // Mutex to protect shared access to tickerResults
@@ -39,14 +39,7 @@ func main() {
 		tickers = append(tickers, ticker)
 	}
 
-	// Launch the browser once for all scraping functions
-	u := launcher.New().Headless(true).MustLaunch()
-	browser := rod.New().ControlURL(u).MustConnect()
-	defer browser.MustClose()
-
 	maxConcurrency := 5
-	// Create a pool
-	pool := rod.NewPool[*rod.Page](maxConcurrency)
 	// Create a semaphore with a buffer to limit concurrency (e.g., 5)
 	semaphore := make(chan struct{}, maxConcurrency)
 
@@ -58,7 +51,18 @@ func main() {
 
 		// Use a WaitGroup to wait for all goroutines to finish
 		var wg sync.WaitGroup
-		wg.Add(5) // Add 5 for each ticker since you're spawning 5 goroutines
+		wg.Add(6) // Add 6 for each ticker since you're spawning 5 goroutines
+
+		go func(ticker string) {
+			defer wg.Done()
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker]
+			result.TickerInfo = tickerInfo[ticker]
+			tickerResults[ticker] = result
+
+		}(ticker)
 
 		go func(ticker string) {
 			defer wg.Done()
@@ -75,62 +79,102 @@ func main() {
 
 			mu.Lock()
 			defer mu.Unlock()
-			tickerResults[ticker] = models.TickerData{
-				TickerInfo: tickerInfo[ticker],
-				LastPrice:  priceData[ticker],
-			}
-		}(ticker)
-
-		go func(ticker string) {
-			defer wg.Done()
-			enterpriseValueData := enterprisevalue.GetEnterpriseValue(browser, pool, ticker)
-
-			mu.Lock()
-			defer mu.Unlock()
 			result := tickerResults[ticker]
-			result.EnterpriseValue = enterpriseValueData[ticker]
-			tickerResults[ticker] = result
-		}(ticker)
 
-		go func(ticker string) {
-			defer wg.Done()
-			roicData := roic.GetRoic(browser, pool, ticker)
-
-			mu.Lock()
-			defer mu.Unlock()
-			result := tickerResults[ticker]
-			result.Roic = roicData[ticker]
-			tickerResults[ticker] = result
+			result.LastPrice = priceData[ticker] // Update the ROIC
+			tickerResults[ticker] = result       // Write back the updated struct
 
 		}(ticker)
 
 		go func(ticker string) {
 			defer wg.Done()
-			ownerEarningsData := ownerearnings.GetOwnerEarnings(browser, pool, ticker)
+
+			// Acquire a slot in the semaphore
+			semaphore <- struct{}{}
+			defer func() {
+				// Release the slot
+				<-semaphore
+			}()
+
+			// Fetch and update enterprise value data
+			enterpriseValueData := enterprisevalue.GetEnterpriseValue(ticker)
 
 			mu.Lock()
 			defer mu.Unlock()
-			result := tickerResults[ticker]
-			result.OwnerEarnings = ownerEarningsData[ticker]
-			tickerResults[ticker] = result
+			result := tickerResults[ticker] // Retrieve the current value of the ticker
+
+			result.EnterpriseValue = enterpriseValueData[ticker] // Update the ROIC
+			tickerResults[ticker] = result                       // Write back the updated struct
+
 		}(ticker)
 
 		go func(ticker string) {
 			defer wg.Done()
-			growthData := growthnumbers.GrowthCatcher(browser, pool, ticker)
+
+			// Acquire a slot in the semaphore
+			semaphore <- struct{}{}
+			defer func() {
+				// Release the slot
+				<-semaphore
+			}()
+
+			// Fetch and update ROIC data
+			roicData := roic.GetRoic(ticker)
 
 			mu.Lock()
 			defer mu.Unlock()
-			result := tickerResults[ticker]
-			result.GrowthData = growthData[ticker]
-			tickerResults[ticker] = result
+			result := tickerResults[ticker] // Retrieve the current value of the ticker
 
+			result.Roic = roicData[ticker] // Update the ROIC
+			tickerResults[ticker] = result // Write back the updated struct
+		}(ticker)
+
+		go func(ticker string) {
+			defer wg.Done()
+
+			// Acquire a slot in the semaphore
+			semaphore <- struct{}{}
+			defer func() {
+				// Release the slot
+				<-semaphore
+			}()
+
+			// Fetch and update owner earnings data
+			ownerEarningsData := ownerearnings.GetOwnerEarnings(ticker)
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker] // Retrieve the current value of the ticker
+
+			result.OwnerEarnings = ownerEarningsData[ticker] // Update the owner earnings
+			tickerResults[ticker] = result                   // Write back the updated struct
+		}(ticker)
+
+		go func(ticker string) {
+			defer wg.Done()
+
+			// Acquire a slot in the semaphore
+			semaphore <- struct{}{}
+			defer func() {
+				// Release the slot
+				<-semaphore
+			}()
+
+			// Fetch and update growth data
+			growthData := growthnumbers.GrowthCatcher(ticker)
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker] // Retrieve the current value of the ticker
+
+			result.GrowthData = growthData[ticker] // Update the growth data
+			tickerResults[ticker] = result         // Write back the updated struct
 		}(ticker)
 
 		go func() {
 			wg.Wait()
 			atomic.AddInt32(&counter, 1)
-			fmt.Printf("Processed %d/%d tickers\n", atomic.LoadInt32(&counter), len(tickers))
+			log.Printf("Processed %d/%d tickers\n", atomic.LoadInt32(&counter), len(tickers))
 			// Mark this iteration as done in the outer WaitGroup
 			outerWg.Done()
 		}()
@@ -144,9 +188,9 @@ func main() {
 	log.Print("Saving data to csv file")
 	filePath := "ticker_data.csv"
 	if err := saveToCSV(filePath, tickerResults); err != nil {
-		fmt.Printf("Error saving to CSV: %v\n", err)
+		log.Printf("Error saving to CSV: %v\n", err)
 	} else {
-		fmt.Printf("Data successfully saved to %s\n", filePath)
+		log.Printf("Data successfully saved to %s\n", filePath)
 	}
 }
 
@@ -295,4 +339,11 @@ func saveToCSV(filePath string, data map[string]models.TickerData) error {
 	}
 
 	return nil
+}
+
+func timer(name string) func() {
+	start := time.Now()
+	return func() {
+		log.Printf("%s took %v\n", name, time.Since(start))
+	}
 }
