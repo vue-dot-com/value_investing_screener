@@ -5,6 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/joho/godotenv"
+	"github.com/vue-dot-com/value_investing_screener/config"
 	"github.com/vue-dot-com/value_investing_screener/models"
 	"github.com/vue-dot-com/value_investing_screener/parsers/enterprisevalue"
 	"github.com/vue-dot-com/value_investing_screener/parsers/growthnumbers"
@@ -14,18 +16,39 @@ import (
 	"github.com/vue-dot-com/value_investing_screener/utils"
 )
 
+// init is invoked before main()
+func init() {
+	// loads values from .env into the system
+	if err := godotenv.Load(); err != nil {
+		log.Print("No configuration .env file found")
+	}
+}
+
 func main() {
 	defer utils.Timer("main")()
+
+	// Load configuration variables
+	conf := config.New()
+	// Set python version. Default is python3.10
+	pythonVersion := conf.Python
+	// Set verbosity for python script execution
+	verbose := conf.Verbose
+	// Set maxConcurrency. Default is 20
+	maxConcurrency := conf.MaxConcurrency
+	// List of tickers selected from the environment variable
+	selectedTicker := conf.Tickers
 
 	// Map to store results for each ticker
 	tickerResults := make(map[string]models.TickerData)
 	var mu sync.Mutex // Mutex to protect shared access to tickerResults
 	// Initialize counter
 	var counter int32
+
 	// Read csv and merge results
 	tickerInfoNasdaq, _ := utils.ReadCSVFile("NASDAQ.csv")
 	tickerInfoNyse, _ := utils.ReadCSVFile("NYSE.csv")
 
+	// Merge ticker information and apply some filtering
 	tickerInfo := utils.MergeTickerInfoMaps(tickerInfoNasdaq, tickerInfoNyse)
 
 	// List of tickers to scrape data for
@@ -34,7 +57,11 @@ func main() {
 		tickers = append(tickers, ticker)
 	}
 
-	maxConcurrency := 20
+	// If configuration has specific tickers use these to find values
+	if len(selectedTicker) > 0 {
+		tickers = selectedTicker
+	}
+
 	// Create a semaphore with a buffer to limit concurrency (e.g., 5)
 	semaphore := make(chan struct{}, maxConcurrency)
 
@@ -70,7 +97,7 @@ func main() {
 			}()
 
 			action := "fast_info[lastPrice]"
-			priceData := price.GetStockPrice(ticker, action)
+			priceData := price.GetStockPrice(ticker, action, pythonVersion, verbose)
 			mu.Lock()
 			defer mu.Unlock()
 			result := tickerResults[ticker]
@@ -181,7 +208,7 @@ func main() {
 
 	// Save to CSV
 	log.Print("Saving data to csv file")
-	filePath := "Screener.csv"
+	filePath := conf.OutputFile
 	if err := utils.SaveToCSV(filePath, tickerResults); err != nil {
 		log.Printf("Error saving to CSV: %v\n", err)
 	} else {

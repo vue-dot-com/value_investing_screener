@@ -5,6 +5,7 @@ go 1.23
 require (
 	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/gocolly/colly v1.2.0
+	github.com/joho/godotenv v1.5.1
 )
 
 require (
