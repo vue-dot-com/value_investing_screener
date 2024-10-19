@@ -17,5 +17,6 @@ type TickerData struct {
 	EnterpriseValue string
 	Roic            string
 	OwnerEarnings   string
+	TenCap          string
 	GrowthData      growthnumbers.GrowthData
 }

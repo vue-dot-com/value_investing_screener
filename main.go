@@ -17,6 +17,7 @@ import (
 	"github.com/vue-dot-com/value_investing_screener/parsers/ownerearnings"
 	"github.com/vue-dot-com/value_investing_screener/parsers/price"
 	"github.com/vue-dot-com/value_investing_screener/parsers/roic"
+	"github.com/vue-dot-com/value_investing_screener/utils"
 )
 
 func main() {
@@ -39,7 +40,7 @@ func main() {
 		tickers = append(tickers, ticker)
 	}
 
-	maxConcurrency := 5
+	maxConcurrency := 20
 	// Create a semaphore with a buffer to limit concurrency (e.g., 5)
 	semaphore := make(chan struct{}, maxConcurrency)
 
@@ -76,12 +77,11 @@ func main() {
 
 			action := "fast_info[lastPrice]"
 			priceData := price.GetStockPrice(ticker, action)
-
 			mu.Lock()
 			defer mu.Unlock()
 			result := tickerResults[ticker]
 
-			result.LastPrice = priceData[ticker] // Update the ROIC
+			result.LastPrice = priceData[ticker] // Update the last price
 			tickerResults[ticker] = result       // Write back the updated struct
 
 		}(ticker)
@@ -146,8 +146,9 @@ func main() {
 			defer mu.Unlock()
 			result := tickerResults[ticker] // Retrieve the current value of the ticker
 
-			result.OwnerEarnings = ownerEarningsData[ticker] // Update the owner earnings
-			tickerResults[ticker] = result                   // Write back the updated struct
+			result.OwnerEarnings = ownerEarningsData[ticker]                 // Update the owner earnings
+			result.TenCap = utils.CalculateTenCap(ownerEarningsData[ticker]) // Update the ten cap
+			tickerResults[ticker] = result                                   // Write back the updated struct
 		}(ticker)
 
 		go func(ticker string) {
@@ -186,7 +187,7 @@ func main() {
 
 	// Save to CSV
 	log.Print("Saving data to csv file")
-	filePath := "ticker_data.csv"
+	filePath := "Screener.csv"
 	if err := saveToCSV(filePath, tickerResults); err != nil {
 		log.Printf("Error saving to CSV: %v\n", err)
 	} else {
@@ -297,7 +298,7 @@ func saveToCSV(filePath string, data map[string]models.TickerData) error {
 
 	// Write the header
 	header := []string{
-		"Ticker", "Name", "IPO Year", "Country", "Sector", "Industry", "Price", "Enterprise Value", "ROIC", "Owner Earnings", "RevenueGrowth10Y", "RevenueGrowth5Y", "EpsGrowth10Y", "EpsGrowth5Y", "EbitGrowth10Y", "EbitGrowth5Y", "EbitdaGrowth10Y", "EbitdaGrowth5Y", "FcfGrowth10Y", "FcfGrowth5Y", "DividendGrowth10Y", "DividendGrowth5Y", "BvGrowth10Y", "BvGrowth5Y", "StockPriceGrowth10Y", "StockPriceGrowth5Y"}
+		"Ticker", "Name", "IPO Year", "Country", "Sector", "Industry", "Market Cap", "Price", "Enterprise Value", "ROIC", "Owner Earnings", "Ten Cap", "RevenueGrowth10Y", "RevenueGrowth5Y", "EpsGrowth10Y", "EpsGrowth5Y", "EbitGrowth10Y", "EbitGrowth5Y", "EbitdaGrowth10Y", "EbitdaGrowth5Y", "FcfGrowth10Y", "FcfGrowth5Y", "DividendGrowth10Y", "DividendGrowth5Y", "BvGrowth10Y", "BvGrowth5Y", "StockPriceGrowth10Y", "StockPriceGrowth5Y"}
 
 	if err := writer.Write(header); err != nil {
 		return err
@@ -312,10 +313,12 @@ func saveToCSV(filePath string, data map[string]models.TickerData) error {
 			td.Country,
 			td.Sector,
 			td.Industry,
+			td.MarketCap,
 			td.LastPrice,
 			td.EnterpriseValue,
 			td.Roic,
 			td.OwnerEarnings,
+			td.TenCap,
 			td.GrowthData.RevenueGrowth10Y,
 			td.GrowthData.RevenueGrowth5Y,
 			td.GrowthData.EpsGrowth10Y,

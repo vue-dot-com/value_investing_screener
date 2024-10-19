@@ -10,7 +10,7 @@ import (
 
 const URL string = "https://www.gurufocus.com/term/owner-earnings/{STOCK}"
 const TAG string = `font[style="font-size: 24px; font-weight: 700; color: #337ab7"]`
-const REGEX string = `[+-]?(?:\d{1,3})(?:\.\d+)?`
+const REGEX string = `\:\s*(.*?)\(`
 const FUNCTION string = "Owner Earnings"
 const RETRIES int = 1
 
@@ -33,9 +33,9 @@ func GetOwnerEarnings(ticker string) map[string]string {
 	// Handle the HTML response and scrape the required element
 	c.OnHTML(TAG, func(e *colly.HTMLElement) {
 		text := e.Text
-		value := regex.FindString(text)
-		if value != "" {
-			result[ticker] = value
+		value := regex.FindStringSubmatch(text)
+		if len(value) > 1 {
+			result[ticker] = sanitize(value[1])
 		} else {
 			result[ticker] = "" // In case the value is not found, set empty
 		}
@@ -64,4 +64,11 @@ func GetOwnerEarnings(ticker string) map[string]string {
 	}
 
 	return result
+}
+
+// Helper function to sanitize return value. The return value is a string like $1,233.456 we want a 1233.456 value
+func sanitize(value string) string {
+	sanitizedValue := strings.TrimSpace(value)
+
+	return sanitizedValue
 }

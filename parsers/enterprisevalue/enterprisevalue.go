@@ -42,7 +42,7 @@ func GetEnterpriseValue(ticker string) map[string]string {
 		value := regex.FindString(text)
 
 		if value != "" {
-			result[ticker] = value
+			result[ticker] = sanitize(value)
 		} else {
 			result[ticker] = "" // In case the value is not found, set empty
 		}
@@ -67,8 +67,15 @@ func GetEnterpriseValue(ticker string) map[string]string {
 
 	if err != nil {
 		result[ticker] = ""
-
 	}
 
 	return result
+}
+
+// Helper function to sanitize return value. The return value is a string like $1,233.456 we want a 1233.456 value
+func sanitize(value string) string {
+	sanitizedValue := strings.Trim(value, ",$")
+	sanitizedValueFinal := strings.ReplaceAll(sanitizedValue, ",", "")
+
+	return sanitizedValueFinal
 }
