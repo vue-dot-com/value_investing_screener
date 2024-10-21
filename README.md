@@ -1,6 +1,6 @@
 # Value Investing Screener
 
-This Go-based project is designed to screen value investing metrics for various stock tickers. It retrieves data such as stock prices, enterprise values, ROIC (Return on Invested Capital), owner earnings, and growth numbers from [GuruFocus](https://www.gurufocus.com/). The output is then saved into a CSV file. Stocks in the NASDAQ and NYSE are pre-loaded and used as the base input source if no tickers are provided.
+This Go-based project is designed to screen value investing metrics for various stock tickers. It retrieves data such as stock prices, fair values, enterprise values, ROIC (Return on Invested Capital), owner earnings, and growth numbers from [GuruFocus](https://www.gurufocus.com/). The output is then saved into a CSV file. Stocks in the NASDAQ and NYSE are pre-loaded and used as the base input source if no tickers are provided.
 
 ## Prerequisites
 

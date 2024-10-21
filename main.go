@@ -9,6 +9,7 @@ import (
 	"github.com/vue-dot-com/value_investing_screener/config"
 	"github.com/vue-dot-com/value_investing_screener/models"
 	"github.com/vue-dot-com/value_investing_screener/parsers/enterprisevalue"
+	"github.com/vue-dot-com/value_investing_screener/parsers/fairvalue"
 	"github.com/vue-dot-com/value_investing_screener/parsers/growthnumbers"
 	"github.com/vue-dot-com/value_investing_screener/parsers/ownerearnings"
 	"github.com/vue-dot-com/value_investing_screener/parsers/price"
@@ -69,7 +70,7 @@ func main() {
 
 		// Use a WaitGroup to wait for all goroutines to finish
 		var wg sync.WaitGroup
-		wg.Add(6) // Add 6 for each ticker since you're spawning 5 goroutines
+		wg.Add(7)
 
 		go func(ticker string) {
 			defer wg.Done()
@@ -188,6 +189,27 @@ func main() {
 			tickerResults[ticker] = result         // Write back the updated struct
 		}(ticker)
 
+		go func(ticker string) {
+			defer wg.Done()
+
+			// Acquire a slot in the semaphore
+			semaphore <- struct{}{}
+			defer func() {
+				// Release the slot
+				<-semaphore
+			}()
+
+			// Fetch and update growth data
+			fairValueData := fairvalue.GetFairValue(ticker)
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker] // Retrieve the current value of the ticker
+
+			result.FairValue = fairValueData[ticker] // Update the growth data
+			tickerResults[ticker] = result           // Write back the updated struct
+		}(ticker)
+
 		go func() {
 			wg.Wait()
 			atomic.AddInt32(&counter, 1)
@@ -200,6 +222,15 @@ func main() {
 
 	// Wait for all iterations (and their goroutines) to complete
 	outerWg.Wait()
+
+	// Posterior calculations
+	for _, ticker := range tickers {
+		result := tickerResults[ticker]
+
+		// Calculate margin of safety
+		result.MarginOfSafety = utils.CalculateMoS(result.LastPrice, result.FairValue)
+		tickerResults[ticker] = result
+	}
 
 	// Save to CSV
 	log.Print("Saving data to csv file")

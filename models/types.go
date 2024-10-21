@@ -14,6 +14,8 @@ type TickerInfo struct {
 type TickerData struct {
 	TickerInfo
 	LastPrice       string
+	FairValue       string
+	MarginOfSafety  string
 	EnterpriseValue string
 	Roic            string
 	OwnerEarnings   string
