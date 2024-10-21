@@ -27,6 +27,21 @@ func CalculateTenCap(ownerearnings string) string {
 	return tenCapString
 }
 
+func CalculateMoS(price, fairvalue string) string {
+
+	marginOfSafetyString := ""
+
+	if price != "" && fairvalue != "" {
+		nPrice, _ := strconv.ParseFloat(price, 32)
+		nFairValue, _ := strconv.ParseFloat(fairvalue, 32)
+		marginOfSafety := (nFairValue - nPrice) / nFairValue * 100
+		marginOfSafetyString := fmt.Sprintf("%f%%", marginOfSafety)
+		return marginOfSafetyString
+	}
+
+	return marginOfSafetyString
+}
+
 func Timer(name string) func() {
 	start := time.Now()
 	return func() {
@@ -137,7 +152,7 @@ func SaveToCSV(filePath string, data map[string]models.TickerData) error {
 
 	// Write the header
 	header := []string{
-		"Ticker", "Name", "IPO Year", "Country", "Sector", "Industry", "Market Cap", "Price", "Enterprise Value", "ROIC", "Owner Earnings", "Ten Cap", "RevenueGrowth10Y", "RevenueGrowth5Y", "EpsGrowth10Y", "EpsGrowth5Y", "EbitGrowth10Y", "EbitGrowth5Y", "EbitdaGrowth10Y", "EbitdaGrowth5Y", "FcfGrowth10Y", "FcfGrowth5Y", "DividendGrowth10Y", "DividendGrowth5Y", "BvGrowth10Y", "BvGrowth5Y", "StockPriceGrowth10Y", "StockPriceGrowth5Y"}
+		"Ticker", "Name", "IPO Year", "Country", "Sector", "Industry", "Market Cap", "Price", "Fair Value", "Margin Of Safety", "Enterprise Value", "ROIC", "Owner Earnings", "Ten Cap", "RevenueGrowth10Y", "RevenueGrowth5Y", "EpsGrowth10Y", "EpsGrowth5Y", "EbitGrowth10Y", "EbitGrowth5Y", "EbitdaGrowth10Y", "EbitdaGrowth5Y", "FcfGrowth10Y", "FcfGrowth5Y", "DividendGrowth10Y", "DividendGrowth5Y", "BvGrowth10Y", "BvGrowth5Y", "StockPriceGrowth10Y", "StockPriceGrowth5Y"}
 
 	if err := writer.Write(header); err != nil {
 		return err
@@ -154,6 +169,8 @@ func SaveToCSV(filePath string, data map[string]models.TickerData) error {
 			td.Industry,
 			td.MarketCap,
 			td.LastPrice,
+			td.FairValue,
+			td.MarginOfSafety,
 			td.EnterpriseValue,
 			td.Roic,
 			td.OwnerEarnings,
