@@ -29,10 +29,6 @@ func main() {
 
 	// Load configuration variables
 	conf := config.New()
-	// Set python version. Default is python3.10
-	pythonVersion := conf.Python
-	// Set verbosity for python script execution
-	verbose := conf.Verbose
 	// Set maxConcurrency. Default is 20
 	maxConcurrency := conf.MaxConcurrency
 	// List of tickers selected from the environment variable
@@ -96,8 +92,7 @@ func main() {
 				<-semaphore
 			}()
 
-			action := "fast_info[lastPrice]"
-			priceData := price.GetStockPrice(ticker, action, pythonVersion, verbose)
+			priceData := price.GetPrice(ticker)
 			mu.Lock()
 			defer mu.Unlock()
 			result := tickerResults[ticker]

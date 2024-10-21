@@ -5,14 +5,7 @@ This Go-based project is designed to screen value investing metrics for various 
 ## Prerequisites
 
 1. **Go**: Make sure Go is installed. You can download it [here](https://golang.org/doc/install).
-2. **Python**: Python 3.10 or above should be installed on your system.
-3. **Python Packages**: You will need to install the required Python packages listed in `requirements.txt`. Run the following command to install them:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **.env file**: You can configure your environment variables through a `.env` file or by exporting them directly into your terminal session.
+2. **.env file**: You can configure your environment variables through a `.env` file or by exporting them directly into your terminal session.
 
 ## Installation
 
@@ -38,8 +31,6 @@ This Go-based project is designed to screen value investing metrics for various 
 
    ```bash
    TICKERS=AAPL,GOOG # Example tickers
-   PYTHON_VERSION=/usr/bin/python3.10 # Path to your Python installation
-   VERBOSE=True # Set verbosity for Python scripts
    MAX_CONCURRENCY=10 # Set the concurrency level
    OUTPUT_FILE=Screener.csv # Output CSV file location
    ```
@@ -72,8 +63,6 @@ This Go-based project is designed to screen value investing metrics for various 
 
      ```bash
      export TICKERS="AAPL,GOOG"
-     export PYTHON_VERSION="/usr/bin/python3.10"
-     export VERBOSE="true"
      export MAX_CONCURRENCY="10"
      export OUTPUT_FILE="usr/home/Screener.csv"
 
@@ -85,8 +74,6 @@ This Go-based project is designed to screen value investing metrics for various 
 The following environment variables are used to configure the screener:
 
 - **`TICKERS`**: A comma-separated list of tickers to process. If not set, the program will default to all tickers in NASDAQ and NYSE.
-- **`PYTHON_VERSION`**: The path to your Python interpreter (e.g., `/usr/bin/python3.10`). Default is `python3.10`.
-- **`VERBOSE`**: Whether to display verbose output (`true` or `false`). Default is `false`.
 - **`MAX_CONCURRENCY`**: The maximum number of concurrent processes. Recommended max is 30. Default is 20.
 - **`OUTPUT_FILE`**: The file path where the results will be saved in CSV format. Default is `Screener.csv`.
 
