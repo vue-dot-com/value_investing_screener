@@ -1,6 +1,6 @@
 module github.com/vue-dot-com/value_investing_screener
 
-go 1.23
+go 1.23.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.0
