@@ -6,46 +6,19 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
+	"github.com/vue-dot-com/value_investing_screener/models"
+	"github.com/vue-dot-com/value_investing_screener/utils"
 )
 
 const URL string = "https://www.gurufocus.com/stock/{STOCK}/financials"
 const TAG string = `tbody[data-v-217973d7]`
 const RETRIES int = 1
 
-type GrowthData struct {
-	RevenueGrowth10Y    string
-	RevenueGrowth5Y     string
-	EpsGrowth10Y        string
-	EpsGrowth5Y         string
-	EbitGrowth10Y       string
-	EbitGrowth5Y        string
-	EbitdaGrowth10Y     string
-	EbitdaGrowth5Y      string
-	FcfGrowth10Y        string
-	FcfGrowth5Y         string
-	DividendGrowth10Y   string
-	DividendGrowth5Y    string
-	BvGrowth10Y         string
-	BvGrowth5Y          string
-	StockPriceGrowth10Y string
-	StockPriceGrowth5Y  string
-}
+func GrowthCatcher(ticker string) map[string]models.GrowthData {
 
-func GrowthCatcher(ticker string) map[string]GrowthData {
-	result := make(map[string]GrowthData)
-	grData := GrowthData{}
+	grData := models.GrowthData{}
 
-	c := colly.NewCollector(
-		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"),
-	)
-
-	c.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-
-	})
-
-	// Match the growth table
-	c.OnHTML(TAG, func(e *colly.HTMLElement) {
+	parseHTML := func(e *colly.HTMLElement, result map[string]models.GrowthData) {
 		// Iterate over the table rows with tr[data-v-217973d7]
 		e.DOM.Find(`tr[data-v-217973d7]`).Each(func(i int, row *goquery.Selection) {
 			// Get all the td elements in the row
@@ -80,26 +53,15 @@ func GrowthCatcher(ticker string) map[string]GrowthData {
 			case 7:
 				grData.StockPriceGrowth10Y, grData.StockPriceGrowth5Y = gr10Y, gr5Y
 			}
+
+			result[ticker] = grData
 		})
-	})
+	}
 
 	// Replace the ticker in the URL and visit the page
 	pageURL := strings.ReplaceAll(URL, "{STOCK}", ticker)
 
-	var err error
-	for attempts := 0; attempts < RETRIES; attempts++ {
-		err = c.Visit(pageURL)
-		if err == nil {
-			break
-		}
-		log.Printf("Attempt %d failed for ticker %s: %v. Retrying...", attempts+1, ticker, err)
-	}
-
-	result[ticker] = grData
-
-	if err != nil {
-		result[ticker] = grData
-	}
+	result := utils.Scraper[models.GrowthData](ticker, pageURL, TAG, parseHTML, RETRIES, grData)
 
 	return result
 }
