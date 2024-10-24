@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"os"
+	"os/signal"
 	"sync"
 	"sync/atomic"
 
@@ -34,6 +36,8 @@ func main() {
 	maxConcurrency := conf.MaxConcurrency
 	// List of tickers selected from the environment variable
 	selectedTicker := conf.Tickers
+	// Output file path
+	filePath := conf.OutputFile
 
 	// Map to store results for each ticker
 	tickerResults := make(map[string]models.TickerData)
@@ -62,6 +66,25 @@ func main() {
 	// Create a semaphore with a buffer to limit concurrency (e.g., 5)
 	semaphore := make(chan struct{}, maxConcurrency)
 
+	// Setup signal catching
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+
+	// Goroutine to handle interrupt signal (Ctrl+C)
+	go func() {
+		for sig := range c {
+			log.Printf("Received signal: %v. Saving current data...", sig)
+			mu.Lock()
+			if err := utils.SaveToCSV(filePath, tickerResults); err != nil {
+				log.Printf("Error saving to CSV: %v\n", err)
+			} else {
+				log.Printf("Data successfully saved to %s\n", filePath)
+			}
+			mu.Unlock()
+			os.Exit(0) // Exit the program gracefully
+		}
+	}()
+
 	// Use an outer WaitGroup to wait for all tickers routines to finish in this way we can increment the counter in the for loop
 	var outerWg sync.WaitGroup
 	outerWg.Add(len(tickers))
@@ -80,7 +103,6 @@ func main() {
 			result := tickerResults[ticker]
 			result.TickerInfo = tickerInfo[ticker]
 			tickerResults[ticker] = result
-
 		}(ticker)
 
 		go func(ticker string) {
@@ -100,7 +122,6 @@ func main() {
 
 			result.LastPrice = priceData[ticker] // Update the last price
 			tickerResults[ticker] = result       // Write back the updated struct
-
 		}(ticker)
 
 		go func(ticker string) {
@@ -122,7 +143,6 @@ func main() {
 
 			result.EnterpriseValue = enterpriseValueData[ticker] // Update the ROIC
 			tickerResults[ticker] = result                       // Write back the updated struct
-
 		}(ticker)
 
 		go func(ticker string) {
@@ -210,31 +230,30 @@ func main() {
 			tickerResults[ticker] = result           // Write back the updated struct
 		}(ticker)
 
-		go func() {
+		go func(ticker string) {
 			wg.Wait()
+
+			mu.Lock()
+			defer mu.Unlock()
+			result := tickerResults[ticker]
+
+			// Calculate margin of safety
+			result.MarginOfSafety = utils.CalculateMoS(result.LastPrice, result.FairValue)
+			tickerResults[ticker] = result
+
 			atomic.AddInt32(&counter, 1)
 			log.Printf("Processed %d/%d tickers\n", atomic.LoadInt32(&counter), len(tickers))
 			// Mark this iteration as done in the outer WaitGroup
 			outerWg.Done()
-		}()
+		}(ticker)
 
 	}
 
 	// Wait for all iterations (and their goroutines) to complete
 	outerWg.Wait()
 
-	// Posterior calculations
-	for _, ticker := range tickers {
-		result := tickerResults[ticker]
-
-		// Calculate margin of safety
-		result.MarginOfSafety = utils.CalculateMoS(result.LastPrice, result.FairValue)
-		tickerResults[ticker] = result
-	}
-
 	// Save to CSV
 	log.Print("Saving data to csv file")
-	filePath := conf.OutputFile
 	if err := utils.SaveToCSV(filePath, tickerResults); err != nil {
 		log.Printf("Error saving to CSV: %v\n", err)
 	} else {
